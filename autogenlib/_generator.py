@@ -35,48 +35,6 @@ def get_codebase_context():
     return context
 
 
-def check_if_empty_module_needed(fullname, caller_info):
-    """Check if the requested module appears to be just for namespacing.
-
-    Args:
-        fullname: The full name of the module being imported
-        caller_info: Information about the calling code
-
-    Returns:
-        bool: True if the module appears to be only for namespacing
-    """
-    if not caller_info or not caller_info.get("code"):
-        return False
-
-    # Check if this looks like a nested import
-    parts = fullname.split(".")
-    if len(parts) <= 2:  # Not a nested module
-        return False
-
-    code = caller_info.get("code", "")
-
-    # If the import is like: from autogenlib.x.y import z
-    # and there's no direct usage of x or x.y, it might be just namespacing
-    module_name = ".".join(parts[:2])  # e.g., 'autogenlib.crypto'
-
-    # Check for direct usage of the module (not just imports)
-    if f"{parts[1]}." in code and not all(
-        f"{parts[1]}." in line
-        for line in code.split("\n")
-        if f"{parts[1]}." in line and "import" in line
-    ):
-        return False  # There's direct usage, so it's not just namespacing
-
-    # Check for import patterns that suggest nested modules
-    parent_module = f"from {parts[0]}.{parts[1]}"
-    child_modules = [
-        line for line in code.split("\n") if parent_module in line and "import" in line
-    ]
-
-    # If there are nested imports and no direct usage, it's likely just namespacing
-    return len(child_modules) > 0
-
-
 def generate_code(description, fullname, existing_code=None, caller_info=None):
     """Generate code using the OpenAI API."""
     parts = fullname.split(".")
@@ -85,9 +43,6 @@ def generate_code(description, fullname, existing_code=None, caller_info=None):
 
     module_name = parts[1]
     function_name = parts[2] if len(parts) > 2 else None
-
-    # Check if this might be an empty module (just for namespacing)
-    is_empty_module = check_if_empty_module_needed(fullname, caller_info)
 
     # Get the cached prompt or use the provided description
     module_to_check = ".".join(fullname.split(".")[:2])  # e.g., 'autogenlib.totp'
@@ -139,8 +94,7 @@ def generate_code(description, fullname, existing_code=None, caller_info=None):
             {code}
             ```
             
-            Analyze how the requested functionality will be used in the code snippets above.
-            Pay special attention to parameter types, return values, and expected behavior.
+            Pay special attention to how the requested functionality will be used in the code snippets above.
             """
         else:
             caller_context = f"""
@@ -150,22 +104,10 @@ def generate_code(description, fullname, existing_code=None, caller_info=None):
             {code}
             ```
             
-            Analyze how the requested functionality will be used in this code.
-            Pay special attention to parameter types, return values, and expected behavior.
+            Pay special attention to how the requested functionality will be used in this code.
             """
 
         logger.debug(f"Including caller context from {caller_info.get('filename')}")
-
-    # Add empty module detection info
-    empty_module_context = ""
-    if is_empty_module:
-        empty_module_context = f"""
-        IMPORTANT: Based on the calling code analysis, this module '{fullname}' appears to be 
-        primarily used for namespacing/structural purposes rather than for its own functionality.
-        
-        If appropriate, you may generate a minimal module with just necessary imports and docstrings,
-        but without substantial implementation if the code doesn't show direct usage of this module.
-        """
 
     # Create a prompt for the OpenAI API
     if function_name and existing_code:
@@ -184,45 +126,23 @@ def generate_code(description, fullname, existing_code=None, caller_info=None):
         
         {caller_context}
         
-        {empty_module_context}
-        
-        I need you to add a new {"function" if not function_name[0].isupper() else "class"} named '{function_name}' that implements the following functionality:
+        Add a new function/class named '{function_name}' (if it is capitalized - you should generate class) that implements the following functionality:
         {description}
         
-        IMPORTANT REQUIREMENTS:
-        1. Maintain consistency with the existing code style, naming patterns, and error handling
-        2. Keep all existing functions and classes intact
-        3. Add comprehensive docstrings with parameters, returns, and exceptions
-        4. Use type hints for better code clarity when appropriate
-        5. Analyze the caller code carefully to ensure the function works with existing data structures
-        6. If analysis suggests this is purely for structural imports with no actual functionality needed,
-           provide minimal implementation with appropriate comments
-        
-        Return the COMPLETE module code including both existing functionality and the new function.
-        Your response must be ONLY valid Python code without any explanations or markdown.
+        Keep all existing functions and classes intact. Follow PEP 8 style guidelines.
+        Provide the complete module code including both existing functionality and the new function.
+        Return ONLY the Python code for this module without any explanations or markdown.
         """
     elif function_name:
         prompt = f"""
-        Create a Python module named '{module_name}' with a {"function" if not function_name[0].isupper() else "class"} named '{function_name}' that implements the following functionality:
+        Create a Python module named '{module_name}' with a function/class named '{function_name}' (if it is capitalized - you should generate class) that implements the following functionality:
         {description}
         
         {codebase_context}
         
         {caller_context}
         
-        {empty_module_context}
-        
-        IMPORTANT REQUIREMENTS:
-        1. Start with a clear module docstring explaining the purpose
-        2. Include detailed docstrings with parameters, returns, and exceptions
-        3. Use type hints when appropriate for clarity
-        4. Implement robust error handling with specific exception types
-        5. Follow strict PEP 8 style guidelines
-        6. Analyze the caller context carefully to match the expected usage pattern
-        7. If analysis suggests this is purely for structural imports with no actual functionality needed,
-           provide minimal implementation with appropriate comments
-        
-        Your response must be ONLY valid Python code without any explanations or markdown.
+        Follow PEP 8 style guidelines. Provide only the Python code without any explanations.
         """
     else:
         prompt = f"""
@@ -233,19 +153,8 @@ def generate_code(description, fullname, existing_code=None, caller_info=None):
         
         {caller_context}
         
-        {empty_module_context}
-        
-        IMPORTANT REQUIREMENTS:
-        1. Start with a clear module docstring explaining the purpose
-        2. Implement functions/classes that fulfill the described purpose
-        3. Include detailed docstrings with parameters, returns, and exceptions
-        4. Use type hints when appropriate for clarity
-        5. Follow strict PEP 8 style guidelines
-        6. Analyze the caller context to structure the package in a way that matches expected usage
-        7. If analysis suggests this is purely for structural imports with no actual functionality needed,
-           provide minimal implementation with appropriate comments
-        
-        Do not generate any additional Python files. Provide only the Python code without explanations.
+        Follow PEP 8 style guidelines. Provide only the Python code without any explanations.
+        Do not generate any additional Python files and do not add file path to your answer.
         """
 
     try:
@@ -260,7 +169,7 @@ def generate_code(description, fullname, existing_code=None, caller_info=None):
         # Initialize the OpenAI client
         client = openai.OpenAI(api_key=api_key, base_url=base_url)
 
-        # logger.debug("Prompt: %s", prompt)
+        logger.debug("Prompt: %s", prompt)
 
         # Call the OpenAI API
         response = client.chat.completions.create(
@@ -269,27 +178,25 @@ def generate_code(description, fullname, existing_code=None, caller_info=None):
                 {
                     "role": "system",
                     "content": (
-                        "You are an expert Python code generator specializing in creating modules on-demand. "
-                        "Your mission is to analyze context thoroughly and produce high-quality Python code "
-                        "that seamlessly integrates with existing codebase.\n\n"
-                        "1. CONTEXT ANALYSIS (CRUCIAL):\n"
-                        "- Deeply analyze caller code to understand exact data structures, types, and usage patterns\n"
-                        "- Pay special attention to how the imported function will be used - parameter types, return values\n"
-                        "- Identify naming conventions, coding style, and error handling approaches in existing code\n"
-                        "- Determine if the import is simply a structural one (nested module) that doesn't require actual code\n\n"
-                        "2. CODE GENERATION PRINCIPLES:\n"
-                        "- Follow strict PEP 8 standards with consistent formatting\n"
-                        "- Use only Python standard library (no third-party packages)\n"
-                        "- Only import modules already defined within this library\n"
-                        "- Create efficient implementations that handle edge cases\n\n"
-                        "3. EMPTY MODULE DETECTION:\n"
-                        "- If the import appears to be a nested/structural import and analysis of caller code suggests "
-                        "no actual functionality is needed, return an empty module with just appropriate comments\n"
-                        "- For example, if code shows `from autogenlib.crypto.hash import md5` but doesn't show usage "
-                        "of autogenlib.crypto directly, the crypto module might just be organizational\n\n"
+                        "You are a helpful assistant that generates Python code for requested modules. "
+                        "You have two main tasks: (1) understand the calling context and (2) generate compatible code.\n\n"
+                        "1. CONTEXT ANALYSIS:\n"
+                        "- Carefully analyze caller code to understand data structures and usage patterns\n"
+                        "- Identify variable types and function signatures from usage examples\n"
+                        "- Ensure generated functions work with the exact data structure shown in the caller code\n"
+                        "- Pay attention to naming conventions in the caller code\n\n"
+                        "2. CODE GENERATION:\n"
+                        "- Ensure all code strictly follows PEP standards and established best practices\n"
+                        "- Use ONLY the Python standard library, and do not import any third-party libraries\n"
+                        "- ONLY import modules that have already been defined within this library\n"
+                        "- Generate code with appropriate error handling and documentation\n"
+                        "- Make reasonable assumptions when information is missing\n\n"
+                        "HANDLING NESTED IMPORTS:\n"
+                        "- If your code needs to use functionality from another module in this library, properly import it\n"
+                        "- If you need to import a module that doesn't exist yet, import it as if it did exist\n"
+                        "- The import system will handle generating any imported modules that don't exist yet\n\n"
                         "RESPONSE FORMAT:\n"
-                        "Provide ONLY valid Python code—no explanations, markdown, or surrounding text. "
-                        "The code should be ready to execute immediately."
+                        "Respond ONLY with the complete Python code for the requested module—no explanations or text outside the code."
                     ),
                 },
                 {"role": "user", "content": prompt},
@@ -300,7 +207,7 @@ def generate_code(description, fullname, existing_code=None, caller_info=None):
         # Get the generated code
         code = response.choices[0].message.content.strip()
 
-        # logger.debug("Answer: %s", code)
+        logger.debug("Answer: %s", code)
 
         # Remove markdown code blocks if present
         if code.startswith("```python"):
