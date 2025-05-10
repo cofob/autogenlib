@@ -14,18 +14,15 @@ logger = logging.getLogger(__name__)
 
 
 class AutoLibFinder(importlib.abc.MetaPathFinder):
-    def __init__(self, desc=None):
-        self.description = desc
+    def __init__(self):
+        pass
 
     def find_spec(self, fullname, path, target=None):
         # Only handle imports under the 'autogenlib' namespace, excluding autogenlib itself
         if not fullname.startswith("autogenlib.") or fullname == "autogenlib":
             return None
 
-        # Get the current description (from instance or global state)
-        current_description = self.description or description
-
-        if not current_description:
+        if not description:
             return None
 
         # Get caller code context
@@ -57,11 +54,11 @@ class AutoLibFinder(importlib.abc.MetaPathFinder):
 
                 # Generate updated code including the new function
                 new_code = generate_code(
-                    current_description, fullname, current_code, caller_info
+                    description, fullname, current_code, caller_info
                 )
                 if new_code:
                     # Update the cache and module
-                    cache_module(module_name, new_code, current_description)
+                    cache_module(module_name, new_code, description)
                     set_module_context(module_name, new_code)
 
                     # Execute the new code in the module's namespace
@@ -80,10 +77,10 @@ class AutoLibFinder(importlib.abc.MetaPathFinder):
 
         if code is None:
             # Generate code using OpenAI's API with caller context
-            code = generate_code(current_description, fullname, None, caller_info)
+            code = generate_code(description, fullname, None, caller_info)
             if code is not None:
                 # Cache the generated code with the prompt
-                cache_module(module_to_check, code, current_description)
+                cache_module(module_to_check, code, description)
                 # Update the module context
                 set_module_context(module_to_check, code)
 

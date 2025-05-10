@@ -40,9 +40,6 @@ pip install -e .
 Set OpenAI API key in `OPENAI_API_KEY` env variable.
 
 ```python
-from autogenlib import init
-init("Library for generating secure random tokens")
-
 # Import a function that doesn't exist yet - it will be automatically generated
 from autogenlib.tokens import generate_token
 
@@ -67,29 +64,12 @@ print(token)
 ### Generate a TOTP Generator
 
 ```python
-from autogenlib import init
-init("Library for generating TOTP codes")
 from autogenlib.totp import totp_generator
+
 print(totp_generator("SECRETKEY123"))
 ```
 
-### Using Context-Awareness
-
-```python
-from autogenlib import init
-init("Library for data processing")
-
-# Define your data structure
-data = [{"user": "Alice", "score": 95}, {"user": "Bob", "score": 82}]
-
-# Import a function - AutoGenLib will see how your data is structured
-from autogenlib.processor import get_highest_score
-
-# The function will work with your data structure without you having to specify details
-print(get_highest_score(data))  # Will correctly extract the highest score
-```
-
-### Add a Verification Function Later
+Add a Verification Function Later
 
 ```python
 # Later in your application, you need verification:
@@ -98,9 +78,23 @@ result = verify_totp("SECRETKEY123", "123456")
 print(f"Verification result: {result}")
 ```
 
+### Using Context-Awareness
+
+```python
+# Import a function - AutoGenLib will see how your data is structured
+from autogenlib.processor import get_highest_score
+
+# Define your data structure
+data = [{"user": "Alice", "score": 95}, {"user": "Bob", "score": 82}]
+
+# The function will work with your data structure without you having to specify details
+print(get_highest_score(data))  # Will correctly extract the highest score
+```
+
 ### Create Multiple Modules
 
 ```python
+# You can use init function to additionally hint the purpose of your library
 from autogenlib import init
 init("Cryptographic utility library")
 

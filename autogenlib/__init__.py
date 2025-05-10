@@ -5,7 +5,10 @@ from ._finder import AutoLibFinder
 from ._exception_handler import setup_exception_handler
 
 
-def init(desc, enable_exception_handler=True, enable_caching=False):
+_sentinel = object()
+
+
+def init(desc=_sentinel, enable_exception_handler=None, enable_caching=None):
     """Initialize autogenlib with a description of the functionality needed.
 
     Args:
@@ -17,9 +20,12 @@ def init(desc, enable_exception_handler=True, enable_caching=False):
     # Update the global description
     from . import _state
 
-    _state.description = desc
-    _state.exception_handler_enabled = enable_exception_handler
-    _state.caching_enabled = enable_caching
+    if desc is not _sentinel:
+        _state.description = desc
+    if enable_exception_handler is not None:
+        _state.exception_handler_enabled = enable_exception_handler
+    if enable_caching is not None:
+        _state.caching_enabled = enable_caching
 
     # Set up exception handler if enabled
     if enable_exception_handler:
@@ -30,9 +36,8 @@ def init(desc, enable_exception_handler=True, enable_caching=False):
     # Add our custom finder to sys.meta_path if it's not already there
     for finder in sys.meta_path:
         if isinstance(finder, AutoLibFinder):
-            finder.description = desc  # Update the description in the existing finder
             return
-    sys.meta_path.insert(0, AutoLibFinder(desc))
+    sys.meta_path.insert(0, AutoLibFinder())
 
 
 def set_exception_handler(enabled=True):
@@ -58,3 +63,5 @@ def set_caching(enabled=True):
 
 
 __all__ = ["init", "set_exception_handler", "setup_exception_handler", "set_caching"]
+
+init()
