@@ -1,0 +1,20 @@
+[project]
+name = "autogenlib"
+version = "0.1.0"
+description = "Import wisdom, export code."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["openai>=1.78.0"]
+authors = [{ name = "Egor Ternovoi", email = "i.am@cfb.wtf" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/cofob/autogenlib"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
