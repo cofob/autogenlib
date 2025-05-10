@@ -5,19 +5,21 @@ from ._finder import AutoLibFinder
 from ._exception_handler import setup_exception_handler
 
 
-def init(desc, enable_exception_handler=True):
+def init(desc, enable_exception_handler=True, enable_caching=False):
     """Initialize autogenlib with a description of the functionality needed.
 
     Args:
         desc (str): A description of the library you want to generate.
         enable_exception_handler (bool): Whether to enable the global exception handler
             that sends exceptions to LLM for fix suggestions. Default is True.
+        enable_caching (bool): Whether to enable caching of generated code. Default is False.
     """
     # Update the global description
     from . import _state
 
     _state.description = desc
     _state.exception_handler_enabled = enable_exception_handler
+    _state.caching_enabled = enable_caching
 
     # Set up exception handler if enabled
     if enable_exception_handler:
@@ -44,4 +46,15 @@ def set_exception_handler(enabled=True):
     _state.exception_handler_enabled = enabled
 
 
-__all__ = ["init", "set_exception_handler", "setup_exception_handler"]
+def set_caching(enabled=True):
+    """Enable or disable caching.
+
+    Args:
+        enabled (bool): Whether to enable caching. Default is True.
+    """
+    from . import _state
+
+    _state.caching_enabled = enabled
+
+
+__all__ = ["init", "set_exception_handler", "setup_exception_handler", "set_caching"]

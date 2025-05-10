@@ -11,7 +11,7 @@ AutoGenLib is a Python library that automatically generates code on-the-fly usin
 - **Dynamic Code Generation**: Import modules and functions that don't exist yet
 - **Context-Aware**: New functions are generated with knowledge of existing code
 - **Progressive Enhancement**: Add new functionality to existing modules seamlessly
-- **Persistent Storage**: Generated code is cached for future use
+- **No Default Caching**: Each import generates fresh code for more varied and creative results
 - **Full Codebase Context**: LLM can see all previously generated modules for better consistency
 - **Caller Code Analysis**: The LLM analyzes the actual code that's importing the module to better understand the context and requirements
 - **Automatic Exception Handling**: All exceptions are sent to LLM to provide clear explanation and fixes for errors.
@@ -59,7 +59,7 @@ print(token)
    - If not, it analyzes the code that's performing the import to understand the context
    - It sends a request to OpenAI's API with your description and the context
    - The API generates the appropriate code
-   - The code is validated, cached, and executed
+   - The code is validated and executed
    - The requested module/function becomes available for use
 
 ## Examples
@@ -137,9 +137,33 @@ import os
 os.environ["OPENAI_API_KEY"] = "your-api-key-here"
 ```
 
-### Cache Location
+### Caching Behavior
 
-By default, generated code is cached in `~/.autogenlib_cache`. You can check this directory to see what has been generated.
+By default, AutoGenLib does not cache generated code. This means:
+
+- Each time you import a module, the LLM generates fresh code
+- You get more varied and often funnier results due to LLM hallucinations
+- The same import might produce different implementations across runs
+
+If you want to enable caching (for consistency or to reduce API calls):
+
+```python
+from autogenlib import init
+init("Library for data processing", enable_caching=True)
+```
+
+Or toggle caching at runtime:
+
+```python
+from autogenlib import init, set_caching
+init("Library for data processing")
+
+# Later in your code:
+set_caching(True)  # Enable caching
+set_caching(False)  # Disable caching
+```
+
+When caching is enabled, generated code is stored in `~/.autogenlib_cache`.
 
 ## Limitations
 

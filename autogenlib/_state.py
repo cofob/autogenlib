@@ -5,3 +5,6 @@ description = None
 
 # Flag to enable/disable the exception handler
 exception_handler_enabled = True
+
+# Flag to enable/disable caching
+caching_enabled = False  # Disabled by default

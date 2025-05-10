@@ -3,6 +3,7 @@
 import os
 import hashlib
 import json
+from ._state import caching_enabled
 
 
 def get_cache_dir():
@@ -26,6 +27,9 @@ def get_cache_path(fullname):
 
 def get_cached_data(fullname):
     """Get the cached data for a module if it exists."""
+    if not caching_enabled:
+        return None
+
     cache_path = get_cache_path(fullname)
     try:
         with open(cache_path, "r") as f:
@@ -37,6 +41,9 @@ def get_cached_data(fullname):
 
 def get_cached_code(fullname):
     """Get the cached code for a module if it exists."""
+    if not caching_enabled:
+        return None
+
     data = get_cached_data(fullname)
     if data:
         return data.get("code")
@@ -45,6 +52,9 @@ def get_cached_code(fullname):
 
 def get_cached_prompt(fullname):
     """Get the cached initial prompt for a module if it exists."""
+    if not caching_enabled:
+        return None
+
     data = get_cached_data(fullname)
     if data:
         return data.get("prompt")
@@ -53,6 +63,9 @@ def get_cached_prompt(fullname):
 
 def cache_module(fullname, code, prompt):
     """Cache the code and prompt for a module."""
+    if not caching_enabled:
+        return
+
     cache_path = get_cache_path(fullname)
     data = {"code": code, "prompt": prompt, "module_name": fullname}
     with open(cache_path, "w") as f:
@@ -61,6 +74,9 @@ def cache_module(fullname, code, prompt):
 
 def get_all_modules():
     """Get all cached modules."""
+    if not caching_enabled:
+        return {}
+
     cache_dir = get_cache_dir()
     modules = {}
 
