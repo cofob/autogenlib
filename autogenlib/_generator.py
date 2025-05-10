@@ -3,6 +3,7 @@
 import openai
 import os
 import ast
+import re
 from ._cache import get_all_modules, get_cached_prompt
 from logging import getLogger
 
@@ -33,6 +34,85 @@ def get_codebase_context():
             context += f"# Module: {module_name}\n```python\n{data['code']}\n```\n\n"
 
     return context
+
+
+def extract_python_code(response):
+    """
+    Extract Python code from LLM response more robustly.
+
+    Handles various ways code might be formatted in the response:
+    - Code blocks with ```python or ``` markers
+    - Multiple code blocks
+    - Indented code blocks
+    - Code without any markers
+
+    Returns the cleaned Python code.
+    """
+    # Check if response is already clean code (no markdown)
+    if validate_code(response):
+        return response
+
+    # Try to extract code from markdown code blocks
+    code_block_pattern = r"```(?:python)?(.*?)```"
+    matches = re.findall(code_block_pattern, response, re.DOTALL)
+
+    if matches:
+        # Join all code blocks and check if valid
+        extracted_code = "\n\n".join(match.strip() for match in matches)
+        if validate_code(extracted_code):
+            return extracted_code
+
+    # If we get here, no valid code blocks were found
+    # Try to identify the largest Python-like chunk in the text
+    lines = response.split("\n")
+    code_lines = []
+    current_code_chunk = []
+
+    for line in lines:
+        # Skip obvious non-code lines
+        if re.match(
+            r"^(#|Here's|I've|This|Note:|Remember:|Explanation:)", line.strip()
+        ):
+            # If we were collecting code, save the chunk
+            if current_code_chunk:
+                code_lines.extend(current_code_chunk)
+                current_code_chunk = []
+            continue
+
+        # Lines that likely indicate code
+        if re.match(
+            r"^(import|from|def|class|if|for|while|return|try|with|@|\s{4}|    )", line
+        ):
+            current_code_chunk.append(line)
+        elif line.strip() == "" and current_code_chunk:
+            # Empty lines within code blocks are kept
+            current_code_chunk.append(line)
+        elif current_code_chunk:
+            # If we have a non-empty line that doesn't look like code but follows code
+            # we keep it in the current chunk (might be a variable assignment, etc.)
+            current_code_chunk.append(line)
+
+    # Add any remaining code chunk
+    if current_code_chunk:
+        code_lines.extend(current_code_chunk)
+
+    # Join all identified code lines
+    extracted_code = "\n".join(code_lines)
+
+    # If we couldn't extract anything or it's invalid, return the original
+    # but the validator will likely reject it
+    if not extracted_code or not validate_code(extracted_code):
+        # Last resort: try to use the whole response if it might be valid code
+        if "def " in response or "class " in response or "import " in response:
+            if validate_code(response):
+                return response
+
+        # Log the issue
+        logger.warning("Could not extract valid Python code from response")
+        logger.debug("Response: %s", response)
+        return response
+
+    return extracted_code
 
 
 def generate_code(description, fullname, existing_code=None, caller_info=None):
@@ -110,51 +190,115 @@ def generate_code(description, fullname, existing_code=None, caller_info=None):
         logger.debug(f"Including caller context from {caller_info.get('filename')}")
 
     # Create a prompt for the OpenAI API
+    system_message = """
+    You are an expert Python developer tasked with generating high-quality, production-ready Python modules.
+    
+    Follow these guidelines precisely:
+    
+    1. CODE QUALITY:
+       - Write clean, efficient, and well-documented code with docstrings
+       - Follow PEP 8 style guidelines strictly
+       - Include type hints where appropriate (Python 3.12+ compatible)
+       - Add comprehensive error handling for edge cases
+       - Create descriptive variable names that clearly convey their purpose
+    
+    2. UNDERSTANDING CONTEXT:
+       - Carefully analyze existing code to maintain consistency
+       - Match the naming conventions and patterns in related modules
+       - Ensure your implementation will work with the exact data structures shown in caller code
+       - Make reasonable assumptions when information is missing, but document those assumptions
+    
+    3. RESPONSE FORMAT:
+       - ONLY provide clean Python code with no explanations outside of code comments
+       - Do NOT include markdown formatting, explanations, or any text outside the code
+       - Do NOT include ```python or ``` markers around your code
+       - Your entire response should be valid Python code that can be executed directly
+    
+    4. IMPORTS:
+       - Use only Python standard library modules unless explicitly told otherwise
+       - If you need to import from within the library (autogenlib), do so as if those modules exist
+       - Format imports according to PEP 8 (stdlib, third-party, local)
+    
+    The code you generate will be directly executed by the Python interpreter, so it must be syntactically perfect.
+    """
+
     if function_name and existing_code:
         prompt = f"""
-        You are extending an existing Python module named '{module_name}'.
+        TASK: Extend an existing Python module named '{module_name}' with a new function/class.
         
-        The overall purpose of this library is:
+        LIBRARY PURPOSE:
         {current_description}
         
-        Here is the existing code for this module:
+        EXISTING MODULE CODE:
         ```python
         {existing_code}
         ```
         
+        CODEBASE CONTEXT:
         {codebase_context}
         
+        CALLER CONTEXT:
         {caller_context}
         
-        Add a new function/class named '{function_name}' (if it is capitalized - you should generate class) that implements the following functionality:
+        REQUIREMENTS:
+        Add a new {"class" if function_name[0].isupper() else "function"} named '{function_name}' that implements:
         {description}
         
-        Keep all existing functions and classes intact. Follow PEP 8 style guidelines.
-        Provide the complete module code including both existing functionality and the new function.
-        Return ONLY the Python code for this module without any explanations or markdown.
+        IMPORTANT INSTRUCTIONS:
+        1. Keep all existing functions and classes intact
+        2. Follow the existing coding style for consistency
+        3. Add comprehensive docstrings and comments where needed
+        4. Include proper type hints and error handling
+        5. Return ONLY the complete Python code for the entire module
+        6. Do NOT include any explanations or markdown formatting in your response
         """
     elif function_name:
         prompt = f"""
-        Create a Python module named '{module_name}' with a function/class named '{function_name}' (if it is capitalized - you should generate class) that implements the following functionality:
-        {description}
+        TASK: Create a new Python module named '{module_name}' with a specific function/class.
         
+        LIBRARY PURPOSE:
+        {current_description}
+        
+        CODEBASE CONTEXT:
         {codebase_context}
         
+        CALLER CONTEXT:
         {caller_context}
         
-        Follow PEP 8 style guidelines. Provide only the Python code without any explanations.
+        REQUIREMENTS:
+        Create a module that contains a {"class" if function_name[0].isupper() else "function"} named '{function_name}' that implements:
+        {description}
+        
+        IMPORTANT INSTRUCTIONS:
+        1. Start with an appropriate module docstring summarizing the purpose
+        2. Include comprehensive docstrings for all functions/classes
+        3. Add proper type hints and error handling
+        4. Return ONLY the complete Python code for the module
+        5. Do NOT include any explanations or markdown formatting in your response
         """
     else:
         prompt = f"""
-        Create a Python package named '{module_name}' that implements the following functionality:
-        {description}
+        TASK: Create a new Python package module named '{module_name}'.
         
+        LIBRARY PURPOSE:
+        {current_description}
+        
+        CODEBASE CONTEXT:
         {codebase_context}
         
+        CALLER CONTEXT:
         {caller_context}
         
-        Follow PEP 8 style guidelines. Provide only the Python code without any explanations.
-        Do not generate any additional Python files and do not add file path to your answer.
+        REQUIREMENTS:
+        Implement functionality for:
+        {description}
+        
+        IMPORTANT INSTRUCTIONS:
+        1. Create a well-structured module with appropriate functions and classes
+        2. Start with a comprehensive module docstring
+        3. Include proper docstrings, type hints, and error handling
+        4. Return ONLY the complete Python code without any explanations
+        5. Do NOT include file paths or any markdown formatting in your response
         """
 
     try:
@@ -175,56 +319,38 @@ def generate_code(description, fullname, existing_code=None, caller_info=None):
         response = client.chat.completions.create(
             model=model,
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a helpful assistant that generates Python code for requested modules. "
-                        "You have two main tasks: (1) understand the calling context and (2) generate compatible code.\n\n"
-                        "1. CONTEXT ANALYSIS:\n"
-                        "- Carefully analyze caller code to understand data structures and usage patterns\n"
-                        "- Identify variable types and function signatures from usage examples\n"
-                        "- Ensure generated functions work with the exact data structure shown in the caller code\n"
-                        "- Pay attention to naming conventions in the caller code\n\n"
-                        "2. CODE GENERATION:\n"
-                        "- Ensure all code strictly follows PEP standards and established best practices\n"
-                        "- Use ONLY the Python standard library, and do not import any third-party libraries\n"
-                        "- ONLY import modules that have already been defined within this library\n"
-                        "- Generate code with appropriate error handling and documentation\n"
-                        "- Make reasonable assumptions when information is missing\n\n"
-                        "HANDLING NESTED IMPORTS:\n"
-                        "- If your code needs to use functionality from another module in this library, properly import it\n"
-                        "- If you need to import a module that doesn't exist yet, import it as if it did exist\n"
-                        "- The import system will handle generating any imported modules that don't exist yet\n\n"
-                        "RESPONSE FORMAT:\n"
-                        "Respond ONLY with the complete Python code for the requested module—no explanations or text outside the code."
-                    ),
-                },
+                {"role": "system", "content": system_message},
                 {"role": "user", "content": prompt},
             ],
             temperature=0.7,
         )
 
         # Get the generated code
-        code = response.choices[0].message.content.strip()
+        raw_response = response.choices[0].message.content.strip()
 
-        logger.debug("Answer: %s", code)
+        logger.debug("Raw response: %s", raw_response)
 
-        # Remove markdown code blocks if present
-        if code.startswith("```python"):
-            code = code.replace("```python", "", 1)
-            code = code.replace("```", "", 1)
-        elif code.startswith("```"):
-            code = code.replace("```", "", 1)
-            code = code.replace("```", "", 1)
+        # Extract and clean the Python code from the response
+        code = extract_python_code(raw_response)
 
-        code = code.strip()
+        logger.debug("Extracted code: %s", code)
 
         # Validate the code
         if validate_code(code):
             return code
         else:
-            print("Generated code is not valid.")
+            logger.error("Generated code is not valid. Attempting to fix...")
+
+            # Try to clean up common issues
+            # Remove any additional text before or after code blocks
+            clean_code = re.sub(r'^.*?(?=(?:"""|\'\'\'))', "", code, flags=re.DOTALL)
+
+            if validate_code(clean_code):
+                logger.info("Fixed code validation issues")
+                return clean_code
+
+            logger.error("Generated code is not valid and could not be fixed")
             return None
     except Exception as e:
-        print(f"Error generating code: {e}")
+        logger.error(f"Error generating code: {e}")
         return None

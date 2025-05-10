@@ -28,7 +28,7 @@ def init(desc=_sentinel, enable_exception_handler=None, enable_caching=None):
         _state.caching_enabled = enable_caching
 
     # Set up exception handler if enabled
-    if enable_exception_handler:
+    if _state.exception_handler_enabled:
         from ._exception_handler import setup_exception_handler
 
         setup_exception_handler()
