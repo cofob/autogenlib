@@ -3,10 +3,14 @@
 import sys
 import importlib.abc
 import importlib.machinery
+import logging
 from ._state import description
 from ._generator import generate_code
 from ._cache import get_cached_code, cache_module
 from ._context import get_module_context, set_module_context
+from ._caller import get_caller_info
+
+logger = logging.getLogger(__name__)
 
 
 class AutoLibFinder(importlib.abc.MetaPathFinder):
@@ -23,6 +27,17 @@ class AutoLibFinder(importlib.abc.MetaPathFinder):
 
         if not current_description:
             return None
+
+        # Get caller code context
+        try:
+            caller_info = get_caller_info()
+            if caller_info.get("code"):
+                logger.debug(f"Got caller context from {caller_info.get('filename')}")
+            else:
+                logger.debug("No caller context available")
+        except Exception as e:
+            logger.warning(f"Error getting caller info: {e}")
+            caller_info = {"code": "", "filename": ""}
 
         # Determine if this is an attribute import (e.g., autogenlib.totp.function_name)
         is_attribute = fullname.count(".") > 1
@@ -41,7 +56,9 @@ class AutoLibFinder(importlib.abc.MetaPathFinder):
                 current_code = module_context.get("code", "")
 
                 # Generate updated code including the new function
-                new_code = generate_code(current_description, fullname, current_code)
+                new_code = generate_code(
+                    current_description, fullname, current_code, caller_info
+                )
                 if new_code:
                     # Update the cache and module
                     cache_module(module_name, new_code, current_description)
@@ -62,8 +79,8 @@ class AutoLibFinder(importlib.abc.MetaPathFinder):
         code = get_cached_code(module_to_check)
 
         if code is None:
-            # Generate code using OpenAI's API
-            code = generate_code(current_description, fullname)
+            # Generate code using OpenAI's API with caller context
+            code = generate_code(current_description, fullname, None, caller_info)
             if code is not None:
                 # Cache the generated code with the prompt
                 cache_module(module_to_check, code, current_description)

@@ -35,7 +35,7 @@ def get_codebase_context():
     return context
 
 
-def generate_code(description, fullname, existing_code=None):
+def generate_code(description, fullname, existing_code=None, caller_info=None):
     """Generate code using the OpenAI API."""
     parts = fullname.split(".")
     if len(parts) < 2:
@@ -52,6 +52,63 @@ def generate_code(description, fullname, existing_code=None):
     # Get the full codebase context
     codebase_context = get_codebase_context()
 
+    # Add caller code context if available
+    caller_context = ""
+    if caller_info and caller_info.get("code"):
+        code = caller_info.get("code", "")
+        # Extract the most relevant parts of the code if possible
+        # Try to focus on the sections that use the requested module/function
+        relevant_parts = []
+        module_parts = fullname.split(".")
+
+        if len(module_parts) >= 2:
+            # Look for imports of this module
+            module_prefix = f"from {module_parts[0]}.{module_parts[1]}"
+            import_lines = [line for line in code.split("\n") if module_prefix in line]
+            if import_lines:
+                relevant_parts.extend(import_lines)
+
+            # Look for usages of the imported functions
+            if len(module_parts) >= 3:
+                func_name = module_parts[2]
+                func_usage_lines = [
+                    line
+                    for line in code.split("\n")
+                    if func_name in line and not line.startswith(("import ", "from "))
+                ]
+                if func_usage_lines:
+                    relevant_parts.extend(func_usage_lines)
+
+        # Include relevant parts if found, otherwise use the whole code
+        if relevant_parts:
+            caller_context = f"""
+            Here is the code that is importing and using this module/function:
+            ```python
+            # File: {caller_info.get("filename", "unknown")}
+            # --- Relevant snippets ---
+            {"\n".join(relevant_parts)}
+            ```
+            
+            And here is the full context:
+            ```python
+            {code}
+            ```
+            
+            Pay special attention to how the requested functionality will be used in the code snippets above.
+            """
+        else:
+            caller_context = f"""
+            Here is the code that is importing this module/function:
+            ```python
+            # File: {caller_info.get("filename", "unknown")}
+            {code}
+            ```
+            
+            Pay special attention to how the requested functionality will be used in this code.
+            """
+
+        logger.debug(f"Including caller context from {caller_info.get('filename')}")
+
     # Create a prompt for the OpenAI API
     if function_name and existing_code:
         prompt = f"""
@@ -67,6 +124,8 @@ def generate_code(description, fullname, existing_code=None):
         
         {codebase_context}
         
+        {caller_context}
+        
         Add a new function/class named '{function_name}' (if it is capitalized - you should generate class) that implements the following functionality:
         {description}
         
@@ -81,6 +140,8 @@ def generate_code(description, fullname, existing_code=None):
         
         {codebase_context}
         
+        {caller_context}
+        
         Follow PEP 8 style guidelines. Provide only the Python code without any explanations.
         """
     else:
@@ -89,6 +150,8 @@ def generate_code(description, fullname, existing_code=None):
         {description}
         
         {codebase_context}
+        
+        {caller_context}
         
         Follow PEP 8 style guidelines. Provide only the Python code without any explanations.
         Do not generate any additional Python files and do not add file path to your answer.
@@ -116,16 +179,24 @@ def generate_code(description, fullname, existing_code=None):
                     "role": "system",
                     "content": (
                         "You are a helpful assistant that generates Python code for requested modules. "
-                        "Ensure all code strictly follows PEP standards and established best practices. "
-                        "Respond ONLY with the complete Python code for the requested module—no explanations or text outside the code. "
-                        "Use ONLY the Python standard library, and do not import any third-party libraries. "
-                        "ONLY import modules that have already been defined within this library (do not import undefined modules and do not create new modules). "
-                        "ONLY generate code that has been requested."
+                        "You have two main tasks: (1) understand the calling context and (2) generate compatible code.\n\n"
+                        "1. CONTEXT ANALYSIS:\n"
+                        "- Carefully analyze caller code to understand data structures and usage patterns\n"
+                        "- Identify variable types and function signatures from usage examples\n"
+                        "- Ensure generated functions work with the exact data structure shown in the caller code\n"
+                        "- Pay attention to naming conventions in the caller code\n\n"
+                        "2. CODE GENERATION:\n"
+                        "- Ensure all code strictly follows PEP standards and established best practices\n"
+                        "- Use ONLY the Python standard library, and do not import any third-party libraries\n"
+                        "- ONLY import modules that have already been defined within this library\n"
+                        "- Generate code with appropriate error handling and documentation\n"
+                        "- Make reasonable assumptions when information is missing\n\n"
+                        "RESPONSE FORMAT:\n"
+                        "Respond ONLY with the complete Python code for the requested module—no explanations or text outside the code."
                     ),
                 },
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=5000,
             temperature=0.7,
         )
 

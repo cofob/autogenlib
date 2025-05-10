@@ -1,3 +1,7 @@
+from logging import DEBUG, basicConfig
+
+basicConfig(level=DEBUG)
+
 from autogenlib import init
 
 init("Library for easy and beatiful logging in CLI")

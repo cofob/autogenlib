@@ -1,4 +1,3 @@
-
 # AutoGenLib
 
 > The only library you'll need ever.
@@ -14,6 +13,8 @@ AutoGenLib is a Python library that automatically generates code on-the-fly usin
 - **Progressive Enhancement**: Add new functionality to existing modules seamlessly
 - **Persistent Storage**: Generated code is cached for future use
 - **Full Codebase Context**: LLM can see all previously generated modules for better consistency
+- **Caller Code Analysis**: The LLM analyzes the actual code that's importing the module to better understand the context and requirements
+- **Automatic Exception Handling**: All exceptions are sent to LLM to provide clear explanation and fixes for errors.
 
 ## Installation
 
@@ -55,7 +56,8 @@ print(token)
 1. You initialize AutoGenLib with a description of what you need
 2. When you import a module or function under the `autogenlib` namespace, the library:
    - Checks if the module/function already exists
-   - If not, it sends a request to OpenAI's API with your description
+   - If not, it analyzes the code that's performing the import to understand the context
+   - It sends a request to OpenAI's API with your description and the context
    - The API generates the appropriate code
    - The code is validated, cached, and executed
    - The requested module/function becomes available for use
@@ -69,6 +71,22 @@ from autogenlib import init
 init("Library for generating TOTP codes")
 from autogenlib.totp import totp_generator
 print(totp_generator("SECRETKEY123"))
+```
+
+### Using Context-Awareness
+
+```python
+from autogenlib import init
+init("Library for data processing")
+
+# Define your data structure
+data = [{"user": "Alice", "score": 95}, {"user": "Bob", "score": 82}]
+
+# Import a function - AutoGenLib will see how your data is structured
+from autogenlib.processor import get_highest_score
+
+# The function will work with your data structure without you having to specify details
+print(get_highest_score(data))  # Will correctly extract the highest score
 ```
 
 ### Add a Verification Function Later
@@ -149,9 +167,10 @@ AutoGenLib creates prompts for the OpenAI API that include:
 1. The description you provided
 2. Any existing code in the module being enhanced
 3. The full context of all previously generated modules
-4. The specific function or feature needed
+4. The code that's importing the module/function (new feature!)
+5. The specific function or feature needed
 
-This comprehensive context helps the LLM generate code that's consistent with your existing codebase.
+This comprehensive context helps the LLM generate code that's consistent with your existing codebase and fits perfectly with how you intend to use it.
 
 ## Contributing
 
