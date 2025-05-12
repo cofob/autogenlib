@@ -121,7 +121,7 @@ Set your OpenAI API key as an environment variable:
 export OPENAI_API_KEY="your-api-key-here"
 # Optional
 export OPENAI_API_BASE_URL="https://openrouter.ai/api/v1"  # Use OpenRouter API
-export OPENAI_API_KEY="openai/gpt-4.1"
+export OPENAI_MODEL="openai/gpt-4.1"
 ```
 
 Or in your Python code (not recommended for production):
