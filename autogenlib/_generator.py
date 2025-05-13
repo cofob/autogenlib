@@ -322,7 +322,7 @@ def generate_code(description, fullname, existing_code=None, caller_info=None):
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.7,
+            temperature=0.1,
         )
 
         # Get the generated code
