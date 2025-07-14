@@ -1,3 +1,34 @@
+
+<div align="right">
+  <details>
+    <summary >🌐 Language</summary>
+    <div>
+      <div align="center">
+        <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=en">English</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=zh-CN">简体中文</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=zh-TW">繁體中文</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=ja">日本語</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=ko">한국어</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=hi">हिन्दी</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=th">ไทย</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=fr">Français</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=de">Deutsch</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=es">Español</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=it">Itapano</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=ru">Русский</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=pt">Português</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=nl">Nederlands</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=pl">Polski</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=ar">العربية</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=fa">فارسی</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=tr">Türkçe</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=vi">Tiếng Việt</a>
+        | <a href="https://openaitx.github.io/view.html?user=cofob&project=autogenlib&lang=id">Bahasa Indonesia</a>
+      </div>
+    </div>
+  </details>
+</div>
+
 # AutoGenLib
 
 > The only library you'll need ever.
