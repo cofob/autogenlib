@@ -6,6 +6,8 @@
 
 AutoGenLib is a Python library that automatically generates code on-the-fly using OpenAI's API. When you try to import a module or function that doesn't exist, AutoGenLib creates it for you based on a high-level description of what you need.
 
+[Video review of library](https://www.youtube.com/watch?v=x6ZBddPiGZE)
+
 ## Features
 
 - **Dynamic Code Generation**: Import modules and functions that don't exist yet
